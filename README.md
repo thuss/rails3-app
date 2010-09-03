@@ -10,8 +10,7 @@ jQuery in one line:
 
 Use this generator file instead:
 
-    % rails new my_app -J -T -m \
-    http://github.com/leshill/rails3-app/raw/master/cuke.rb
+    % rails new my_app -J -T -m http://github.com/leshill/rails3-app/raw/master/cuke.rb
 
 rvm
 ---
