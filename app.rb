@@ -5,13 +5,12 @@ RVMRC
 
 create_file ".rvmrc", rvmrc
 
-gem "factory_girl_rails", ">= 1.0.0", :group => :test
+gem "factory_girl_rails", ">= 1.2.0", :group => :test
 gem "factory_girl_generator", ">= 0.0.1", :group => [:test, :development]
-gem "haml-rails", ">= 0.0.2"
-gem "rspec-rails", ">= 2.0.0.beta.12", :group => :test
+gem "haml-rails", ">= 0.2"
+gem "rspec-rails", ">= 2.0.0.beta.20", :group => :test
 
 generators = <<-GENERATORS
-
     config.generators do |g|
       g.test_framework :rspec, :fixture => true, :views => false
       g.integration_tool :rspec, :fixture => true, :views => true
@@ -52,7 +51,7 @@ docs = <<-DOCS
 Run the following commands to complete the setup of #{app_name.humanize}:
 
 % cd #{app_name}
-% gem install bundler --pre
+% gem install bundler
 % bundle install
 % script/rails generate rspec:install
 
