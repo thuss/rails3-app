@@ -1,60 +1,114 @@
-rvmrc = <<-RVMRC
-rvm_gemset_create_on_use_flag=1
-rvm gemset use #{app_name}
-RVMRC
+initializer 'generators.rb', <<-RUBY
+Rails.application.config.generators do |g|
+end
+RUBY
 
-create_file ".rvmrc", rvmrc
+template = {"orm"=>"activerecord", "unit_testing"=>"rspec", "integration_testing"=>"cucumber", "javascript"=>"jquery", "authentication"=>"devise", "templating"=>"haml", "css"=>"sass"}
+recipes = template.values.flatten
 
-gem "factory_girl_rails", ">= 1.2.0", :group => :test
-gem "factory_girl_generator", ">= 0.0.1", :group => [:test, :development]
-gem "haml-rails", ">= 0.2"
-gem "rspec-rails", ">= 2.0.0.beta.20", :group => :test
+def say_recipe(name); say "\033[36m" + "recipe".rjust(10) + "\033[0m" + "    Running #{name} recipe..." end
+def say_wizard(text); say "\033[36m" + "wizard".rjust(10) + "\033[0m" + "    #{text}" end
 
-generators = <<-GENERATORS
-    config.generators do |g|
-      g.test_framework :rspec, :fixture => true, :views => false
-      g.integration_tool :rspec, :fixture => true, :views => true
-    end
-GENERATORS
+@after_blocks = []
+def after_bundler(&block); @after_blocks << block; end
 
-application generators
+# >-----------------------------[ ActiveRecord ]------------------------------<
 
-get "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js",  "public/javascripts/jquery.js"
-get "http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.1/jquery-ui.min.js", "public/javascripts/jquery-ui.js"
-get "http://github.com/rails/jquery-ujs/raw/master/src/rails.js", "public/javascripts/rails.js"
+# Use the default ActiveRecord database store.
+say_recipe 'ActiveRecord'
 
-gsub_file 'config/application.rb', 'config.action_view.javascript_expansions[:defaults] = %w()', 'config.action_view.javascript_expansions[:defaults] = %w(jquery.js jquery-ui.js rails.js)'
+# No additional code required.
 
-layout = <<-LAYOUT
-!!!
-%html
-  %head
-    %title #{app_name.humanize}
-    = stylesheet_link_tag :all
-    = javascript_include_tag :defaults
-    = csrf_meta_tag
-  %body
-    = yield
-LAYOUT
+# >---------------------------------[ RSpec ]---------------------------------<
 
-remove_file "app/views/layouts/application.html.erb"
-create_file "app/views/layouts/application.html.haml", layout
+# Use RSpec for unit testing for this Rails app.
+say_recipe 'RSpec'
 
-create_file "log/.gitkeep"
-create_file "tmp/.gitkeep"
+gem 'rspec-rails', '>= 2.0.1', :group => [:development, :test]
 
-git :init
-git :add => "."
+inject_into_file "config/initializers/generators.rb", :after => "Rails.application.config.generators do |g|\n" do
+  "    g.test_framework = :rspec\n"
+end
 
-docs = <<-DOCS
+after_bundler do
+  generate 'rspec:install'
+end
 
-Run the following commands to complete the setup of #{app_name.humanize}:
+# >-------------------------------[ Cucumber ]--------------------------------<
 
-% cd #{app_name}
-% gem install bundler
-% bundle install
-% script/rails generate rspec:install
+# Use Cucumber for integration testing with Capybara.
+say_recipe 'Cucumber'
 
-DOCS
+gem 'cucumber-rails', :group => :test
+gem 'capybara', :group => :test
 
-log docs
+after_bundler do
+  generate "cucumber:install --capybara#{' --rspec' if recipes.include?('rspec')}#{' -D' unless recipes.include?('activerecord')}"
+end
+
+# >--------------------------------[ jQuery ]---------------------------------<
+
+# Adds the latest jQuery and Rails UJS helpers for jQuery.
+say_recipe 'jQuery'
+
+inside "public/javascripts" do
+  get "https://github.com/rails/jquery-ujs/raw/master/src/rails.js", "rails.js"
+  get "http://code.jquery.com/jquery-1.4.4.js", "jquery/jquery.js"
+end
+
+application do
+  "\n    config.action_view.javascript_expansions[:defaults] = %w(jquery.min rails)\n"
+end
+
+gsub_file "config/application.rb", /# JavaScript.*\n/, ""
+gsub_file "config/application.rb", /# config\.action_view\.javascript.*\n/, ""
+
+# >--------------------------------[ Devise ]---------------------------------<
+
+# Utilize Devise for authentication, automatically configured for your selected ORM.
+say_recipe 'Devise'
+
+gem 'devise'
+
+after_bundler do
+  generate 'devise:install'
+
+  case template['orm']
+    when 'mongo_mapper'
+      gem 'mm-devise'
+      gsub_file 'config/intializers/devise.rb', 'devise/orm/active_record', 'devise/orm/mongo_mapper_active_model'
+    when 'mongoid'
+      gsub_file 'config/intializers/devise.rb', 'devise/orm/active_record', 'devise/orm/mongoid'
+    when 'active_record'
+      # Nothing to do
+      
+    generate 'devise user'
+  end
+end
+
+# >---------------------------------[ HAML ]----------------------------------<
+
+# Utilize HAML for templating.
+say_recipe 'HAML'
+
+gem 'haml', '>= 3.0.0'
+gem 'haml-rails'
+
+# >---------------------------------[ SASS ]----------------------------------<
+
+# Utilize SASS (through the HAML gem) for really awesome stylesheets!
+say_recipe 'SASS'
+
+unless recipes.include? 'haml'
+  gem 'haml', '>= 3.0.0'
+end
+
+
+
+
+# >-----------------------------[ Run Bundler ]-------------------------------<
+
+say_wizard "Running Bundler install. This will take a while."
+run 'bundle install'
+say_wizard "Running after Bundler callbacks."
+@after_blocks.each{|b| b.call}
